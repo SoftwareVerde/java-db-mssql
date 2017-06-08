@@ -210,4 +210,11 @@ public class MssqlDatabase implements Database {
     public void disconnect() {
         try { _connection.close(); } catch (final SQLException e) { }
     }
+
+    /**
+     * Require dependencies be packaged at compile-time.
+     */
+    private static final Class[] UNUSED = {
+        com.microsoft.sqlserver.jdbc.SQLServerDriver.class
+    };
 }
