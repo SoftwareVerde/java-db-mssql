@@ -1,6 +1,9 @@
 package com.softwareverde.database.mssql;
 
 import com.softwareverde.database.Database;
+import com.softwareverde.database.DatabaseConnection;
+import com.softwareverde.database.DatabaseException;
+import com.softwareverde.database.Row;
 import com.softwareverde.database.mssql.row.MssqlRowFactory;
 import com.softwareverde.database.mssql.row.RowFactory;
 import com.softwareverde.util.Util;
@@ -9,7 +12,7 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class MssqlDatabase implements Database {
+public class MssqlDatabase implements Database<Connection> {
     private RowFactory _rowFactory = new MssqlRowFactory();
     private String _username = "root";
     private String _password = "";
@@ -17,75 +20,10 @@ public class MssqlDatabase implements Database {
     private String _port = "1433";
     private String _databaseName = "";
 
-    private Integer _version = 1;
-    private Connection _connection;
-    private Boolean _isConnected = false;
-    private String _lastInsertId = "-1";
-
-    private String _extractInsertId(final PreparedStatement preparedStatement) {
-
-        try {
-            final ResultSet resultSet = preparedStatement.getGeneratedKeys();
-
-            final Integer insertId;
-            {
-                if (resultSet.next()) {
-                    insertId = resultSet.getInt(1);
-                }
-                else {
-                    insertId = null;
-                }
-            }
-
-            resultSet.close();
-            return Util.coalesce(insertId, "-1").toString();
-        }
-        catch (final SQLException e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    private PreparedStatement _prepareStatement(final String query, final String[] parameters) {
-        try {
-            final PreparedStatement preparedStatement = _connection.prepareStatement(query, Statement.RETURN_GENERATED_KEYS);
-            if (parameters != null) {
-                for (int i = 0; i < parameters.length; ++i) {
-                    preparedStatement.setString(i+1, parameters[i]);
-                }
-            }
-            return preparedStatement;
-        }
-        catch (final SQLException e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    private void _executeSql(final String query, final String[] parameters) {
-        try {
-            final PreparedStatement preparedStatement = _prepareStatement(query, parameters);
-            preparedStatement.execute();
-            _lastInsertId = _extractInsertId(preparedStatement);
-            preparedStatement.close();
-        }
-        catch (final SQLException e) {
-            _lastInsertId = null;
-            e.printStackTrace();
-        }
-    }
-
-    private void _connect() {
-        try {
-            Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
-            final String connectionString = "jdbc:sqlserver://"+ _url +":"+ _port +";databaseName="+ _databaseName;
-            _connection = DriverManager.getConnection(connectionString, _username, _password);
-            _isConnected = true;
-        }
-        catch (final Exception e) {
-            _isConnected = false;
-            e.printStackTrace();
-        }
+    private Connection _connect() throws ClassNotFoundException, SQLException {
+        final String connectionString = "jdbc:sqlserver://"+ _url +":"+ _port +";databaseName="+ _databaseName;
+        Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
+        return DriverManager.getConnection(connectionString, _username, _password);
     }
 
     public MssqlDatabase(final String url, final String username, final String password) {
@@ -103,112 +41,16 @@ public class MssqlDatabase implements Database {
 
     public void setDatabase(final String databaseName) {
         _databaseName = databaseName;
-
-        if (_isConnected) {
-            try {
-                _connection.setCatalog(databaseName);
-            }
-            catch (final SQLException e) {
-                e.printStackTrace();
-            }
-        }
     }
 
     @Override
-    public void connect() {
-        _connect();
-    }
-
-    @Override
-    public Boolean isConnected() {
-        return _isConnected;
-    }
-
-    @Override
-    public synchronized void executeDdl(final String query) {
-        if (! _isConnected) { return; }
-
+    public DatabaseConnection<Connection> newConnection() throws DatabaseException {
         try {
-            final Statement statement = _connection.createStatement();
-            statement.execute(query);
-            statement.close();
+            Connection connection = _connect();
+            return new MssqlDatabaseConnection(connection);
+        } catch (Exception e) {
+            throw new DatabaseException("Unable to create MSSQL connection.", e);
         }
-        catch (final SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    @Override
-    public synchronized Long executeSql(final String query, final String[] parameters) {
-        if (! _isConnected) { return 0L; }
-
-        _executeSql(query, parameters);
-        return Util.parseLong(_lastInsertId);
-    }
-
-    @Override
-    public synchronized List<Row> query(final String query, final String[] parameters) {
-        if (! _isConnected) { new ArrayList<Row>(); }
-
-        try {
-            final PreparedStatement preparedStatement = _prepareStatement(query, parameters);
-            final ResultSet resultSet = preparedStatement.executeQuery();
-
-            final List<Row> results = new ArrayList<Row>();
-            while (resultSet.next()) {
-                results.add(_rowFactory.fromResultSet(resultSet));
-            }
-            resultSet.close();
-            preparedStatement.close();
-
-            return results;
-        }
-        catch (final SQLException e) {
-            e.printStackTrace();
-            return new ArrayList<Row>();
-        }
-    }
-
-    @Override
-    public Integer getVersion() {
-        return _version;
-    }
-
-    @Override
-    public void setVersion(final Integer newVersion) {
-        _version = newVersion;
-    }
-
-    @Override
-    public Boolean shouldBeCreated() {
-        return false;
-    }
-
-    @Override
-    public Boolean shouldBeUpgraded() {
-        return false;
-    }
-
-    @Override
-    public Boolean shouldBeDowngraded() {
-        return false;
-    }
-
-    @Override
-    public Database newConnection() {
-        final MssqlDatabase newConnection = new MssqlDatabase(_url, _username, _password, _port);
-        if (_databaseName != null) {
-            newConnection.setDatabase(_databaseName);
-        }
-        if (_isConnected) {
-            newConnection.connect();
-        }
-        return newConnection;
-    }
-
-    @Override
-    public void disconnect() {
-        try { _connection.close(); } catch (final SQLException e) { }
     }
 
     /**
