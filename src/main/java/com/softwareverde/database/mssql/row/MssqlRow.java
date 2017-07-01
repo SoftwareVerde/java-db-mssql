@@ -1,6 +1,5 @@
 package com.softwareverde.database.mssql.row;
 
-import com.softwareverde.database.Database;
 import com.softwareverde.database.Row;
 
 import java.sql.ResultSet;
