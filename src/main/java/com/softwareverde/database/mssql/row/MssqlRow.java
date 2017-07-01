@@ -67,7 +67,15 @@ public class MssqlRow implements Row {
 
     @Override
     public Boolean getBoolean(String columnName) {
-        return Boolean.parseBoolean(getValue(columnName));
+        String value = getValue(columnName);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value) > 0;
+        } catch (NumberFormatException e) {
+            return value.equalsIgnoreCase("true") || value.equalsIgnoreCase("t") || value.equalsIgnoreCase("yes") || value.equalsIgnoreCase("y");
+        }
     }
 
     @Override
