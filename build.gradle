@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'java-library'
+    id 'maven-publish'
 }
 
 group 'com.softwareverde'
@@ -78,4 +79,12 @@ task javadocJar(type: Jar, dependsOn: javadoc) {
 artifacts {
     archives sourcesJar
     archives javadocJar
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
 }
