@@ -1,16 +1,23 @@
+plugins {
+    id 'java'
+    id 'java-library'
+}
+
 group 'com.softwareverde'
-version '1.0.3'
+version '2.0.0'
 
 apply plugin: 'java'
 
-sourceCompatibility = 1.7
+compileJava {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
 
 task makeJar(type: Jar) {
     manifest {
-        attributes  'Implementation-Title': 'Java Database MS SQL Wrapper',
-                    'Implementation-Version': version
+        attributes  'Implementation-Title': 'Java Database MSSQL Wrapper',
+                    'Implementation-Version': archiveVersion
     }
-    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
     with jar
 }
 
@@ -20,11 +27,12 @@ repositories {
 }
 
 dependencies {
-    compile group: 'com.github.softwareverde', name: 'java-db', version: 'v2.+'
-    compile group: 'com.github.softwareverde', name: 'java-util', version: 'v+'
-    compile group: 'com.microsoft.sqlserver', name: 'mssql-jdbc', version: '6.1.0.jre7'
+    api                 group: 'com.microsoft.sqlserver',   name: 'mssql-jdbc', version: '11.2.2.jre8'
+    api                 group: 'com.github.softwareverde',  name: 'java-db',    version: 'v3.3.0'
 
-    testCompile group: 'junit', name: 'junit', version: '4.11'
+    implementation      group: 'com.github.softwareverde',  name: 'java-util',  version: 'v2.7.2'
+
+    testImplementation  group: 'junit',                     name: 'junit',      version: '4.12'
 }
 
 tasks.withType(Test) {
@@ -53,3 +61,21 @@ tasks.withType(Test) {
     }
 }
 
+tasks.withType(Javadoc) {
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+task sourcesJar(type: Jar, dependsOn: classes) {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    archiveClassifier = 'javadoc'
+    from javadoc.destinationDir
+}
+
+artifacts {
+    archives sourcesJar
+    archives javadocJar
+}
